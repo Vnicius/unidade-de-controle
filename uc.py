@@ -1,54 +1,69 @@
  #!/usr/bin/python
  #-*- coding: utf-8-*-
 
+############################
+# Control Unit Simulator
+# Duo: Matheus Lima     (github.com/matheus-lima)
+#      Vinicius Matheus (github.com/vnicius)
+############################
+
 import re
 
 class ControlUnit():
-    def __init__(self,mem_data,mem_instr):
-        self.mem_data = mem_data    #Memória de dados
-        self.mem_instr = mem_instr       #Memória de instruções
-        self.reg = [0] * 4       #Array de registradores
-        self.ir = ""     #Armazena a instrução atual
-        self.pc = 0      #Armazena o endereço da próxima instrução
-        self.flags = [False] * 4      #Flags condicionais
+    def __init__(self, data_mem, instr_mem):
+        self.data_mem = data_mem     #Memória de dados
+        self.instr_mem = instr_mem   #Memória de instruções
+        self.reg = [0] * 4           #Array de registradores
+        self.ir = ""                 #Armazena a instrução atual
+        self.pc = 0                  #Armazena o endereço da próxima instrução
+        self.flags = [False] * 4     #Flags condicionais [zero, menor que, maior que, igual]
+                                    # zero = 1000 , maior que = 0010, igual que = 0001 ... 
 
-    def add_mem_instr(self,instr):
-        self.mem_instr.append(instr)
+    def fill_instr_mem(self, instr):
+        self.instr_mem.append(instr)
 
     def fetch(self):
-        self.ir = self.mem_instr[self.pc]
-        self.pc += 1
+        self.ir = self.instr_mem[self.pc] #busca na memoria de instrucao e atualiza IR
+        self.pc += 1                      #atualiza pc
 
     def decode_exec(self):
         instr = self.ir.split(" ")  #Divide a instrução
         op = instr[0].upper()       #Pega a operação da instrução
-
+        data = ''.join(instr[1:]).replace(" ", '')
+        #Avalia qual tipo de operacao
         if (op == "ADD") or (op == "SUB") or (op == "DIV") or (op == "MULT"):   #Casos seja uma operação aritmética
-            self.arithmetic(op,instr[1:])
+            self.arithmetic(op, data)
         elif op == "STORE":
-            self.store(instr[1:])
+            self.store(data)
         elif op == "LOAD":
-            self.load(instr[1:])
+            self.load(data)
+        elif op == "MOV":
+            self.mov(data)
+        elif op == "JMP":
+            self.jmp(data)
+        elif op == "CMP":
+            self.cmp(data)
+        elif op == "JL" or op == "JG" or op == "JE" or op == "JZ":
+            self.conditional_jump(op, data)
 
+    def arithmetic(self, operation, data):
+        #data: Transforma o array data em string e retira os espaços
+        operands = data.split(",")               #Separa os operandos
+        op1 = op2 = 0                            #Variaveis para guardar os dois operandos da operação
 
-    def arithmetic(self,operation,data):
-        data = ''.join(data).replace(" ",'')    #Transforma o array data em string e retira os espaços
-        operands = data.split(",")      #Separa os operandos
-        op1 = op2 = 0       #Variaveis para guardar os dois operandos da operação
+        reg_result = int(operands[0][1])         #Guarda o indíce do registrador de saída
 
-        reg_result = int(operands[0][1])    #Guarda o indíce do registrador de saída
-
-        if "R" in operands[1].upper():      #Confere se é um registrador
-            op1 = self.reg[int(operands[1][1])]     #Pega apenas o número do registrador
-        elif "MD" in operands[1].upper():   #Confere se é um acesso à memória
-            op1 = self.mem_data[int(re.sub(r'[^\d]','',operands[1].upper()))]   #Pega apenas o endereço da memória
+        if "R" in operands[1].upper():           #Confere se é um registrador
+            op1 = self.reg[int(operands[1][1])]  #Pega apenas o número do registrador
+        elif "MD" in operands[1].upper():        #Confere se é um acesso à memória de dados
+            op1 = self.data_mem[int(re.sub(r'[^\d]', '', operands[1].upper()))]   #Pega apenas o endereço da memória
         else:
-            op1 = int(operands[1])      #Caso seja um número
+            op1 = int(operands[1])               #Caso seja um número
 
         if "R" in operands[2].upper():
             op2 = self.reg[int(operands[2][1])]
         elif "MD" in operands[2].upper():
-            op2 = self.mem_data[int(re.sub(r'[^\d]','',operands[2].upper()))]
+            op2 = self.data_mem[int(re.sub(r'[^\d]', '', operands[2].upper()))]
         else:
             op2 = int(operands[2])
 
@@ -61,64 +76,114 @@ class ControlUnit():
         elif operation == "DIV":
             self.reg[reg_result] = int(op1 / op2)
 
-        #print (self.reg[reg_result])
-
-    def store(self,data):
+    def store(self, data): # STORE MD[] R[] or MD[] X
         """Recebe um endereço da memória e o dado que será armazenado nele"""
-        data = ''.join(data).replace(" ",'')    #Transforma o array data em string e retira os espaços
         operands = data.split(',')
         value = 0
 
-        mem_endr = int(re.sub(r'[^\d]','',operands[0].upper()))     #Endereço na memória
+        adress_mem = int(re.sub(r'[^\d]', '', operands[0].upper()))     #Endereço na memória
 
-        if "R" in operands[1].upper():      #Confere se é um registrador
+        if "R" in operands[1].upper():          #Confere se é um registrador
             value = self.reg[int(operands[1][1])]
         else:
             value = int(operands[1])
 
-        self.mem_data[mem_endr] = value     #Armazena o dado no endereço da memória
+        self.data_mem[adress_mem] = value         #Armazena o dado no endereço da memória
 
 
-    def load(self,data):
+    def load(self, data): # lOAD R[] MD[]
         '''Armazena dados da memória de dados (ou valores) no registrador indicado'''
-        data = ''.join(data).replace(" ",'')    #Transforma o array data em string e retira os espaços
         operands = data.split(',')
         value = -1
 
         reg_result = int(operands[0][1])
 
-        if "MD" in operands[1].upper():   #Confere se é um acesso à memória
-            value = self.mem_data[int(re.sub(r'[^\d]','',operands[1].upper()))]   #Pega apenas o endereço da memória
-        else:
-            value = int(operands[1])      #Caso seja um número
+        if "MD" in operands[1].upper():         #Confere se é um acesso à memória
+            value = self.data_mem[int(re.sub(r'[^\d]', '', operands[1].upper()))]   #Pega apenas o endereço da memória
 
         self.reg[reg_result] = value
 
+    def mov(self, data): #MOV R0, R1 or MOV R0, 5
+        operands = data.split(',')
+        value = -1
+        
+        reg_result = int(operands[0][1])
+
+        if "R" in operands[1]:
+            value = self.reg[int(operands[1][1])]
+        else:
+            value = int(operands[1])
+
+        self.reg[reg_result] = value
+
+    def jmp(self, data): # JMP MI[]
+        
+        if "MI" in data.upper():         #Confere se é um acesso à memória
+            self.pc = int(re.sub(r'[^\d]', '', data.upper()))   #Pega apenas o endereço da memória
+        else:
+            #data é o rotulo
+            for x in range(len(self.instr_mem)):
+                if self.instr_mem[x].upper() == data.upper():
+                    self.pc = x+1
+                    break
+
+        self.flags = [False] * 4 #reset flags
+
+    def cmp(self, data): #CMP R[X] R[Y]
+    #atualiza as flahs
+        operands = data.split(',')
+        value = -1
+
+        if len(operands) == 1: #Compara se eh igual a zero
+            value = self.reg[int(operands[0][1])]
+            if value == 0:
+                self.flags[0] = True
+            #else ja eh falso
+        else: #dois argumentos: R[X] <operation> R[Y]
+            #recovery values from regs
+            value = self.reg[int(operands[0][1])]   
+            value2 = self.reg[int(operands[1][1])]
+            if value > value2:
+                self.flags[2] = True
+            elif value < value2:
+                self.flags[1] = True
+            elif value == value2:
+                self.flags[3] = True
+
+    def conditional_jump(self, op, data):
+        if op == "JZ" and self.flags[0]:
+            self.jmp(data)
+        elif op == "JL" and self.flags[1]:
+            self.jmp(data)
+        elif op == "JG" and self.flags[2]:
+            self.jmp(data)
+        elif op == "JE" and self.flags[3]:
+            self.jmp(data)
+
+
     def __str__(self):
-        return ("\nIR: "+self.ir+"\nMem_data: "+str(self.mem_data)+"\nReg: "+str(self.reg)+"\nPC: "+str(self.pc)+"\nFlags: "+str(self.flags))
+        return ("\nIR: "+self.ir+"\ndata_mem: "+str(self.data_mem)+"\nReg: "+str(self.reg)+"\nPC: "+str(self.pc)+"\nFlags: "+str(self.flags))
 
 #########################
 
-mem_data = [0] * 10
-mem_instr = []
+data_mem = [0] * 10
+instr_mem = []
 
 name = "prog.txt"
 #name = input("Arquivo: ")
-file = open(name,"r")
+file = open(name, "r")
 
-uc = ControlUnit(mem_data,mem_instr)
+uc = ControlUnit(data_mem, instr_mem)
 
 for line in file.readlines():
     if line is not "\s":
-        uc.add_mem_instr(line.replace("\n",""))
+        uc.fill_instr_mem(line.replace("\n", ""))
 file.close()
 
-i = 0
-tam = len(uc.mem_instr)
+tam = len(uc.instr_mem)
 
-while i < tam:
+while uc.pc < tam:
     uc.fetch()
     uc.decode_exec()
-    i += 1
     print(uc)
     input()

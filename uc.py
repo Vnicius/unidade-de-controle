@@ -166,7 +166,7 @@ class ControlUnit():
 
 #########################
 
-data_mem = [0] * 10
+data_mem = [0] * 16
 instr_mem = []
 
 name = "prog.txt"

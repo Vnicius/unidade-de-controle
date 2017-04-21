@@ -17,7 +17,7 @@ class ControlUnit():
         self.ir = ""                 #Armazena a instrução atual
         self.pc = 0                  #Armazena o endereço da próxima instrução
         self.flags = [False] * 4     #Flags condicionais [zero, menor que, maior que, igual]
-                                    # zero = 1000 , maior que = 0010, igual que = 0001 ... 
+                                    # zero = 1000 , maior que = 0010, igual que = 0001 ...
 
     def fill_instr_mem(self, instr):
         self.instr_mem.append(instr)
@@ -106,7 +106,7 @@ class ControlUnit():
     def mov(self, data): #MOV R0, R1 or MOV R0, 5
         operands = data.split(',')
         value = -1
-        
+
         reg_result = int(operands[0][1])
 
         if "R" in operands[1]:
@@ -117,7 +117,7 @@ class ControlUnit():
         self.reg[reg_result] = value
 
     def jmp(self, data): # JMP MI[]
-        
+
         if "MI" in data.upper():         #Confere se é um acesso à memória
             self.pc = int(re.sub(r'[^\d]', '', data.upper()))   #Pega apenas o endereço da memória
         else:
@@ -141,7 +141,7 @@ class ControlUnit():
             #else ja eh falso
         else: #dois argumentos: R[X] <operation> R[Y]
             #recovery values from regs
-            value = self.reg[int(operands[0][1])]   
+            value = self.reg[int(operands[0][1])]
             value2 = self.reg[int(operands[1][1])]
             if value > value2:
                 self.flags[2] = True
@@ -165,25 +165,25 @@ class ControlUnit():
         return ("\nIR: "+self.ir+"\ndata_mem: "+str(self.data_mem)+"\nReg: "+str(self.reg)+"\nPC: "+str(self.pc)+"\nFlags: "+str(self.flags))
 
 #########################
+if __name__ == "__main__":
+    data_mem = [0] * 16
+    instr_mem = []
 
-data_mem = [0] * 16
-instr_mem = []
+    #name = "fibonacci.txt"
+    name = input("Programa: ")
+    file = open(name, "r")
 
-name = "prog.txt"
-#name = input("Arquivo: ")
-file = open(name, "r")
+    uc = ControlUnit(data_mem, instr_mem)
 
-uc = ControlUnit(data_mem, instr_mem)
+    for line in file.readlines():
+        if line is not "\s":
+            uc.fill_instr_mem(line.replace("\n", ""))
+    file.close()
 
-for line in file.readlines():
-    if line is not "\s":
-        uc.fill_instr_mem(line.replace("\n", ""))
-file.close()
+    tam = len(uc.instr_mem)
 
-tam = len(uc.instr_mem)
-
-while uc.pc < tam:
-    uc.fetch()
-    uc.decode_exec()
-    print(uc)
-    input()
+    while uc.pc < tam:
+        uc.fetch()
+        uc.decode_exec()
+        print(uc)
+        input()
